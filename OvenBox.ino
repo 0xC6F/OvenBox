@@ -10,9 +10,9 @@
 #define CONTROL "BANGBANG"
 //#define CONTROL "PID"
 
-#define kp = 2;
-#define ki = 5;
-#define kd = 1;
+#define kp 2;
+#define ki 5;
+#define kd 1;
 
 #define THERMISTOR_VOLTAGE 5
 #define RESISTOR_HIGH 180.00
@@ -36,14 +36,22 @@ double cumError, rateError;
 String selectedProfile[] = {"","","","","",""};
 
 void setup() {
+  pinMode(8,OUTPUT);
+  digitalWrite(8,HIGH);
+  pinMode(4,OUTPUT);
+  digitalWrite(4,HIGH);
+  
   pinMode(SSR_PIN,OUTPUT);
   lcd.begin();
   lcd.backlight();
+  Serial.begin(115200);
   getProfileFromSD('0');
   currentTemperature = (steinHartTemp(THERM1_PIN,RESISTOR_LOW)+steinHartTemp(THERM2_PIN,RESISTOR_LOW))/2;
 }
 
 void loop() {
+  double output = (steinHartTemp(THERM1_PIN,RESISTOR_LOW) + steinHartTemp(THERM2_PIN,RESISTOR_LOW))/2.0;
+  Serial.println(output);
   writeLCD(selectedProfile[0]+": "+ selectedProfile[1],"S*:"+selectedProfile[2]+" St:"+selectedProfile[3]);
   delay(4000);
   writeLCD(selectedProfile[0]+": "+ selectedProfile[1],"R*:"+selectedProfile[4]+" Rt:"+selectedProfile[5]);
@@ -70,7 +78,7 @@ void getProfileFromSD(char desiredIndex){
   selectedProfile[4] = "";
   selectedProfile[5] = "";
   
-  Serial.begin(115200);
+  //Serial.begin(115200);
   int i = 0;
   
   if (!SD.begin(10)) {
@@ -98,7 +106,7 @@ void getProfileFromSD(char desiredIndex){
     }
   }
   profilesFile.close();
-  Serial.end();
+  //Serial.end();
 }
 
 int heatCheck(int temperature){
@@ -115,21 +123,24 @@ int heatCheck(int temperature){
     error = setPoint - temperature;                                // determine error
     cumError += error * elapsedTime;                // compute integral
     rateError = (error - lastError)/elapsedTime;   // compute derivative
-    double output = kp*error + ki*cumError + kd*rateError;                //PID output               
+//    int output = kp*error + ki*cumError + kd*rateError;                //PID output               
     lastError = error;                                //remember current error
     }
     return output;
   }
 
-int steinHartTemp(int thermPin, float resistor){
+double steinHartTemp(int thermPin, float resistor){
   /* https://rusefi.com/Steinhart-Hart.html */
   double a = 0.0007958948;
   double b = 0.0002135888;
   double c = 0.0000000650;
-
-  float voltage = (analogRead(thermPin)/1023)*THERMISTOR_VOLTAGE;
+  double temperature = 0;
   
-  int temperature =(-1.0/b)*(log(((resistor*voltage)/(a*(THERMISTOR_VOLTAGE-voltage)))-(c/a)));
+  float voltage = ((double)analogRead(thermPin)/1023)*(double)THERMISTOR_VOLTAGE;
+  double resistance = (double)resistor/(double)(THERMISTOR_VOLTAGE/voltage-1);
+
+  temperature = (double)(1.0/(a+b*log(resistance)+c*pow(log(resistance),3)))- 273.15;
+  //int temperature =(-1.0/b)*(log(((resistor*voltage)/(a*(THERMISTOR_VOLTAGE-voltage)))-(c/a)));
   //t = 273,15 ° C + [a0 + a1 · ln r]-1
   return temperature;
   }
